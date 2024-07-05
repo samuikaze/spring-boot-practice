@@ -343,27 +343,211 @@ public class Human {
     }
     ```
 
-- `@RequestBody`、`@ResponseBody` 與 `@RestController` Annotations
+- `@Controller` 與 `@RestController`
+
+  兩個 Annotations 都可套用於 Controller 類別上，其主要差異在於 `@Controller` 需在每個方法上宣告 `@ResponseBody` Annotation 才能讓回應的資料格式變成 JSON，而 `@RestController` 則不需要，如下範例：
+
+  ```java
+  @Controller
+  public class DemoController {
+
+    @GetMapping("/demo")
+    @ResponseBody
+    public String demo() {
+      return "Hello demo.";
+    }
+  }
+  ```
+
+  ```java
+  @RestController
+  public class DemoController {
+
+    @GetMapping("/demo")
+    public String demo() {
+      return "Hello demo.";
+    }
+  }
+  ```
+
+- `@RequestBody` 與 `@ResponseBody`
+
+  `@RequestBody` 是取得請求酬載資料時使用，而 `@ResponseBody` 則是將物件轉換成 Json 回應資料，如下範例：
+
+  ```java
+  // HumanDTO.java
+  @Data
+  public class HumanDTO {
+    private String name;
+    private Integer age;
+    private Integer height;
+    private Integer weight;
+  }
+
+  // SearchHumanDTO.java
+  @Data
+  public class SearchHumanDTO {
+    private String name;
+  }
+
+  // DemoController.java
+  @Controller
+  public class DemoController {
+
+    @GetMapping("/human")
+    @ResponseBody
+    public HumanDTO getHumanInfo(@RequestBody SearchHumanDTO searchParam) {
+      HumanDTO human = new HumanDTO();
+      human.name = searchParam.name;
+      human.age = 16;
+      human.height = 165;
+      human.weight = 45;
+
+      return human;
+    }
+  }
+  ```
 
 - `RequestEntity` 與 `ResponseEntity`
 
-- `@RequestMapping` 與 `@<METHOD>Mapping`
+  `RequestEntity` 主要功能為當需要於專案內透過 HTTP 協定呼叫 API 時，可以透過此物件建立請求的內容，包含標頭、方法、URI 與請求酬載等，如下範例：
+
+  ```java
+  @GetMapping("/resources/{id}")
+  public Resource getResource(@PathVariable("id") String id) {
+    RequestEntity<void> request = RequestEntity
+      .get(URI.create("http://localhost:8081/resources/" + id))
+      .accept(MediaType.APPLICATION_JSON)
+      .build();
+
+    ResponseEntity<Resource> response = restTemplate.exchange(request, Resource.class);
+    return response.getBody();
+  }
+  ```
+
+  而 `ResponseEntity` 則是用於建立回應的物件，其區分為 new 物件的方式與 Builder 方式，如下範例：
+
+  - new 物件方式
+
+    ```java
+    @GetMapping("/human")
+    public ResponseEntity<HumanDTO> getHumanInfo() {
+      HumanDTO human = new HumanDTO();
+      human.name = "Steven";
+      human.age = 16;
+      human.height = 165;
+      human.weight = 45;
+
+      return new ResponseEntity<HumanDTO>(
+        human,
+        HttpStatus.OK
+      );
+    }
+    ```
+
+  - Builder 方式
+
+    ```java
+    @GetMapping("/human")
+    public ResponseEntity<HumanDTO> getHumanInfo() {
+      HumanDTO human = new HumanDTO();
+      human.name = "Steven";
+      human.age = 16;
+      human.height = 165;
+      human.weight = 45;
+
+      return ResponseEntity.ok(human);
+    }
+    ```
+
+- `@RequestMapping` 與 `@GetMapping`
+
+  `@RequestMapping` 的用途是在指定各 Controller 方法所對應的網址，或是指定該 Controller 網址的前綴，如下兩個範例其 API 的路徑皆為 `/demo/example`：
+
+  - 指定 Controller 網址前綴
+
+    ```java
+    @RestController
+    @RequestMapping("/demo")
+    public class DemoController {
+
+      @RequestMapping(value = "/example", method = RequestMethod.GET)
+      public String getDemoString() {
+        return "Hello demo!";
+      }
+    }
+    ```
+
+  - 指定各方法路徑
+
+    ```java
+    @RestController
+    public class DemoController {
+
+      @RequestMapping(value = "/demo/example", method = RequestMethod.GET)
+      public String getDemoString() {
+        return "Hello demo!";
+      }
+    }
+    ```
+
+  而 `@GetMapping` 為 Spring 4.3 中出現的，其等效於 `@RequestMapping(method = RequestMethod.GET)`，與 `@RequestMapping` 最大的差異在於 `@GetMapping` 僅可宣告於類別的方法上，不可宣告於類別上，如下範例，其 API 路徑為 `/demo/example`：
+
+  ```java
+  @RestController
+  @RequestMapping("/demo")
+  public class DemoController {
+
+    @GetMapping("/example")
+    public String getDemoString() {
+      return "Hello demo!";
+    }
+  }
+  ```
+
+### Plain Old Java Object (POJO)
+
+POJO 是 Java 中僅有屬性，沒有方法的物件種類之一。
+
+在開發過程中，當 Controller 接受到請求，或從 Repository 收到查詢結果，都應透過相對應的 POJO 進行型別轉換，避免將不必要的資料暴露給客戶端或從客戶端收到不必要的資料，以下是幾個常在 Java 中見到的 POJO 物件：
+
+- Value Object (VO):
+
+  此物件用途為單純儲存資料用，因此其所有的屬性值僅可在建構式中初始化，後續每個屬性皆沒有 Setter 方法可以變更其值。常用於從其它 Web Service 中收到回應。
+
+- Data Transfer Object (DTO):
+
+  此物件非常常在 Java 中見到，其用途為過濾客戶端請求的資料、在應用程式各層間傳輸資料。
+
+- Persistent Object (PO):
+
+  此物件常用於資料庫寫入，另一常用名稱為 Entity。
+
+- Business Object (BO):
+
+  此物件常用於業務邏輯層，其與 PO、VO 最大差異在於其包含有複雜的業務邏輯，Service 物件是其一種應用。
+
+- Data Access Object (DAO):
+
+  常用於儲存查詢資料庫的邏輯，Repository 是其一種應用。
+
+應依其使用情境決定要使用哪個 POJO，而 POJO 間的轉換最常見也最穩定的方式就是透過重新建立一個新的 POJO 後，將原本的屬性儲存到新的 POJO 中。但若屬性數量比較多，可以使用 ObjectMapper 套件協助轉換，但若會在 POJO 上使用 `@JsonProperty` 設定 JSON 格式欄位名稱的話，ObjectMapper 就不適合使用於 POJO 的轉換。
 
 ### Service
 
-內容待補
-
-- DTO
-
-- Mapping
+在撰寫過程中，會習慣將業務與商業邏輯放到 Service 層中處理，避免 Controller 過於肥大，而每個 Service 的方法所處理的邏輯不應太過複雜，應符合「單一職責原則」進行開發，每個 Service 也應透過其負責的領域進行拆分。
 
 ### Repository
 
-內容待補
+Repository 實際用途在於處理資料庫資料的寫入、查詢、刪除，在 Spring Boot 中可以透過建立一個介面，並繼承 `JpaRepository`，就可以達到其目的，也可以透過 `EntityManager` 宣告需要的方法進行資料的處理，以下
 
 - EntityManager
 
+  EntityManager 的實作方式與其它語言的框架較相近，先建立一個
+
 - JPQL
+
+  - `@Query` 與 `@NamedQuery`
 
 - 效能優化說明
 
@@ -418,10 +602,19 @@ public class Human {
 ### IDE
 
 - [Eclipse Intellisense?](https://stackoverflow.com/a/4225995)
+- [How to change back the perspective after terminating the debugged process in Eclipse?](https://stackoverflow.com/a/522958)
+- [How to run Spring Boot web application in Eclipse itself?](https://stackoverflow.com/a/28349142)
 
-### Spring Boot
+### Java
 
+- [一次搞懂POJO、PO、DTO、VO、BO](https://hackmd.io/@MonsterLee/HJyAdgRBB#)
+- [DTO、VO、BO、DAO、POJO 各種 Object](https://hackmd.io/@OceanChiu/HJBvCZcQ8)
+
+### Spring Boot Common
+
+- [深入理解 Spring Boot 架構](https://www.51cto.com/article/757069.html)
 - [30天帶你潮玩Spring Boot Zone 系列](https://ithelp.ithome.com.tw/users/20119569/ironman/2159)
+- [Learning From JHipster](https://github.com/albert-hg/learning-from-jhipster)
 - [Guide to Spring @Autowired](https://www.baeldung.com/spring-autowire)
 - [Using Spring ResponseEntity to Manipulate the HTTP Response](https://www.baeldung.com/spring-response-entity)
 - [Spring’s RequestBody and ResponseBody Annotations](https://www.baeldung.com/spring-request-response-body)
@@ -430,12 +623,153 @@ public class Human {
 - [Open PowerShell terminal in Eclipse](https://stackoverflow.com/a/72845794)
 - [How to start up spring-boot application via command line?](https://stackoverflow.com/a/55200392)
 - [[Spring Boot] 請求與回應](https://hackmd.io/@winnienotes/BJ0R84fUj)
+- [Spring Boot: RequestEntity vs ResponseEntity | RequestBody vs ResponseBody](https://medium.com/@daryl-goh/spring-boot-requestentity-vs-responseentity-requestbody-vs-responsebody-dc808fb0d86c)
+- [Spring ResponseEntity](https://hackmd.io/@JohnnyTsai/SJ-AwULBP)
+- [Spring RequestMapping](https://www.baeldung.com/spring-requestmapping)
+- [Java Spring: automatic EntityToDTO mapping using a method instead of an attribute](https://stackoverflow.com/a/67065874)
+- [(17) Spring Boot 導入 Liquibase](https://medium.com/learning-from-jhipster/17-spring-boot-%E5%B0%8E%E5%85%A5-liquibase-c00bc6c481db)
+- [Spring Boot Docker](https://spring.io/guides/topicals/spring-boot-docker)
+- [Spring boot autowiring an interface with multiple implementations](https://stackoverflow.com/questions/51766013/spring-boot-autowiring-an-interface-with-multiple-implementations)
+- [Singleton Design Pattern vs Singleton Beans in Spring Boot](https://www.baeldung.com/spring-boot-singleton-vs-beans)
+- [How to Set a Header on a Response with Spring 6](https://www.baeldung.com/spring-response-header)
+- [@Component vs @Repository and @Service in Spring](https://www.baeldung.com/spring-component-repository-service)
+- [Generate list of dtos to the list of entities using Java 8](https://stackoverflow.com/a/67688827)
+- [Swagger Like a Pro with Spring Boot 3 and Java 17](https://medium.com/@berktorun.dev/swagger-like-a-pro-with-spring-boot-3-and-java-17-49eed0ce1d2f)
+
+### Spring Boot Validation
+
+- [Validation in Spring Boot](https://www.baeldung.com/spring-boot-bean-validation)
+- [How do I customize default error message from spring @Valid validation?](https://stackoverflow.com/a/33664636)
+- [Spring Boot REST API Validate Path Variables Examples](https://www.codejava.net/frameworks/spring-boot/rest-api-validate-path-variables-examples)
+- [Validating RequestParams and PathVariables in Spring](https://www.baeldung.com/spring-validate-requestparam-pathvariable)
+- [Validations in Spring Boot](https://medium.com/@himani.prasad016/validations-in-spring-boot-e9948aa6286b)
+- [Spring Boot Validation not working with Generics](https://stackoverflow.com/a/73910373)
+- [Java generic type validation](https://stackoverflow.com/a/73583412)
+- [Include variable value in validation message](https://stackoverflow.com/a/74736185)
+- [Regex date format validation on Java](https://stackoverflow.com/a/2149692)
+- [https://stackoverflow.com/a/4528094](How to sanity check a date in Java)
+- [Get Missing Fields When HttpMessageNotReadableException occurs](https://stackoverflow.com/a/71210685)
+- [How to handle jackson deserialization error for all kinds of data mismatch in spring boot](https://stackoverflow.com/a/52196438)
+- [Spring @JsonFormat exception handler](https://stackoverflow.com/a/76511648)
+- [Validation with Spring Boot - the Complete Guide](https://reflectoring.io/bean-validation-with-spring-boot/)
+- [How to validate date in the format "MM/dd/yyyy" in Spring Boot?](https://stackoverflow.com/a/53540029)
+
+### Exception Handler
+
+- [Java Spring Boot: Exception Handling](https://stackoverflow.com/a/74525772)
+- [Error Handling for REST with Spring](https://www.baeldung.com/exception-handling-for-rest-with-spring)
+- [Exception Handling in Spring MVC](https://spring.io/blog/2013/11/01/exception-handling-in-spring-mvc)
+- [Spring Boot ExceptionHandler for MethodArgumentNotValidException in RestController never gets invoked](https://stackoverflow.com/a/66373975)
+- [How we can get different @ExceptionHandler for different controllers in java spring boot?](https://stackoverflow.com/a/73150426)
+- [ExceptionHandler shared by multiple controllers](https://stackoverflow.com/a/7557241)
+- [How to have two ControllerAdvice in the same SpringMvc application](https://stackoverflow.com/a/34878952)
+- [different response for a same exception using @controlleradvice and @exceptionhandler if exception is generating from different controller](https://stackoverflow.com/a/60356230)
+
+### Web Client
+
+- [Spring Boot – WebClient with Example](https://www.geeksforgeeks.org/spring-boot-webclient-with-example/)
+- [Spring 5 WebClient](https://www.baeldung.com/spring-5-webclient)
+- [retrieve()](https://docs.spring.io/spring-framework/reference/web/webflux-webclient/client-retrieve.html)
+- [Get list of objects as response Web client Java](https://stackoverflow.com/a/76690118)
 
 ### JPA
 
+- [Spring Data JPA](https://spring.io/projects/spring-data-jpa)
 - [springframeworkguru/spring-boot-mariadb-example - GitHub](https://github.com/springframeworkguru/spring-boot-mariadb-example)
 - [Qualified bean must be of 'EntityManagerFactory' type in Spring Boot 3. Works with Spring Boot 2](https://stackoverflow.com/a/74861220)
 - [Unable to resolve name [org.hibernate.dialect.MySQL5InnoDBDialect] as strategy [org.hibernate.dialect.Dialect]](https://stackoverflow.com/a/74580109)
 - [What is the MariaDB dialect class name for Hibernate?](https://stackoverflow.com/a/51734560)
 - [Introduction to Project Lombok](https://www.baeldung.com/intro-to-project-lombok)
 - [How can I make an auto-incremental id in springBoot](https://stackoverflow.com/a/74616094)
+- [(19) 導入Spring-Data-JPA，將資料庫與物件進行綁定與 Sequence 的設定](https://medium.com/learning-from-jhipster/19-%E5%B0%8E%E5%85%A5spring-data-jpa-%E5%B0%87%E8%B3%87%E6%96%99%E5%BA%AB%E8%88%87%E7%89%A9%E4%BB%B6%E9%80%B2%E8%A1%8C%E7%B6%81%E5%AE%9A%E8%88%87-sequence-%E7%9A%84%E8%A8%AD%E5%AE%9A-d96724c03458)
+- [(20) Controller、Service、Repository的建立 - 1 _ JpaRepository 的使用](https://medium.com/learning-from-jhipster/20-controller-service-repository%E7%9A%84%E5%BB%BA%E7%AB%8B-1-jparepository-%E7%9A%84%E4%BD%BF%E7%94%A8-6606de7c9d41)
+- [Defining Query Methods](https://docs.spring.io/spring-data/jpa/reference/repositories/query-methods-details.html)
+- [How to store @Query sql in external file for CrudRepository?](https://stackoverflow.com/a/50409558)
+- [How to write multiple line property value using PropertiesConfiguration?](https://stackoverflow.com/a/8978515)
+- [How to Use Spring Data JPA Named Queries](https://attacomsian.com/blog/spring-data-jpa-named-queries)
+- [How can I log SQL statements in Spring Boot?](https://stackoverflow.com/a/31249985)
+- [Show Hibernate/JPA SQL Statements from Spring Boot](https://www.baeldung.com/sql-logging-spring-boot)
+- [Spring-data JPA 搭配 Optional 的使用](https://jerry80409.github.io/2018/12/24/spring-data-jpa-and-optional/)
+- [java.util.NoSuchElementException: No value present Spring JPA](https://stackoverflow.com/a/65466956)
+- [How to Access EntityManager with Spring Data](https://www.baeldung.com/spring-data-entitymanager)
+
+## WebFlux
+
+### Reactive Programming
+
+- [Spring Framework - WebFlux Overview](https://docs.spring.io/spring-framework/reference/web/webflux/new-framework.html)
+- [Guide to Spring 5 WebFlux](https://www.baeldung.com/spring-webflux)
+- [How to get request body from ServerRequest object in Spring WebFlux reactive?](https://stackoverflow.com/a/64396389)
+- [RestController with Spring WebFlux :Required parameter is not present](https://stackoverflow.com/a/50209402)
+- [a-mountain/realworld-spring-webflux](https://github.com/a-mountain/realworld-spring-webflux)
+- [Introduction to Reactive Programming with Spring Webflux](https://gokhana.dev/reactive-programming-with-spring-webflux/)
+- [What is the recommended project structure for spring boot rest projects? [closed]](https://stackoverflow.com/a/55590796)
+- [Learn reactive programming with Spring WebFlux](https://medium.com/@aashigangrade06/learn-reactive-programming-with-spring-webflux-6b53cfd0c038)
+
+### Reactive Repository
+
+- [Spring Data JPA 非阻塞](https://hackmd.io/@bloxmithp/BkCzRafG3)
+- [Reactive Programming with Java Spring, R2DBC and MariaDB](https://dev.to/probablyrealrob/reactive-programming-with-java-spring-r2dbc-and-mariadb-3327)
+- [Spring WebFlux Tutorial with CRUD Example](https://howtodoinjava.com/spring-webflux/spring-webflux-tutorial/)
+- [Reactive programming with Spring Data R2DBC](https://medium.com/pictet-technologies-blog/reactive-programming-with-spring-data-r2dbc-ee9f1c24848b)
+- [R2DBC vs Spring Jdbc Vs Spring Data JDBC?](https://stackoverflow.com/a/68918139)
+- [Asynchronous RDBMS access with Spring Data R2DBC](https://lankydan.dev/2019/02/16/asynchronous-rdbms-access-with-spring-data-r2dbc)
+- [R2DBC – Reactive Relational Database Connectivity](https://www.baeldung.com/r2dbc)
+
+## Swagger
+
+- [springdoc-openapi v2.5.0 - Get Started](https://springdoc.org/#getting-started)
+- [spring boot 專案使用Swagger 標示API](https://medium.com/@openthedidi2004/spring-boot-%E5%B0%88%E6%A1%88%E4%BD%BF%E7%94%A8swagger-%E6%A8%99%E7%A4%BAapi-36ae720e8905)
+- [why Swagger UI is not working in Spring Boot 3.0 version?](https://stackoverflow.com/a/75926275)
+- [Documenting Spring Boot REST API with SpringDoc + OpenAPI 3](https://www.dariawan.com/tutorials/spring/documenting-spring-boot-rest-api-springdoc-openapi-3/)
+- [Spring boot : Migrating from Springfox Swagger 2 to Springdoc OpenAPI 3](https://deepak-shinde.medium.com/migrating-from-springfox-swagger-2-to-springdoc-openapi-3-79a79757b8d1)
+- [How to add swagger or spring doc annotation to pojos columns？](https://github.com/jOOQ/jOOQ/issues/14779#issuecomment-1465654439)
+- [springdoc-openapi how to display an list of object class as a response?](https://stackoverflow.com/a/74410256)
+- [SwaggerUI Response Examples do not work with mediaType JSON](https://stackoverflow.com/a/63710058)
+- [Swagger - Setting Default media-type or Accept Header for responses](https://stackoverflow.com/a/74274711)
+- [spring boot 3 使用swagger](https://hackmd.io/@_XeDPt_GRpu82pxm_rKHrQ/rysozEsCo)
+
+### Logging
+
+- [Logging in Spring Boot](https://www.baeldung.com/spring-boot-logging)
+
+### 日期與時間處理
+
+- [Java：日期時間格式化輸出入處理：Date、Calendar、SimpleDateFormat](https://www.ewdna.com/2009/01/javadatecalendardateformatsimpledatefor.html)
+- [How to get the current date/time in Java [duplicate]](https://stackoverflow.com/a/5175900)
+- [Android 使用LocalDate、LocalTime、LocalDateTime等Java8的日期時間](https://medium.com/evan-android-note/android-%E4%BD%BF%E7%94%A8localdate-localtime-localdatetime%E7%AD%89java8%E7%9A%84%E6%97%A5%E6%9C%9F%E6%99%82%E9%96%93-a78a41becee7)
+- [Convert java.util.Date to String](https://stackoverflow.com/a/5683761)
+- [Jackson Date](https://www.baeldung.com/jackson-serialize-dates)
+- [Deserialize JSON date format to ZonedDateTime using objectMapper](https://stackoverflow.com/a/57183634)
+- [How do I force a Spring Boot JVM into UTC time zone?](https://stackoverflow.com/a/54321163)
+- [String to java.sql.Date](https://stackoverflow.com/a/18439059)
+
+### Object Mapper
+
+- [Intro to the Jackson ObjectMapper](https://www.baeldung.com/jackson-object-mapper-tutorial#bd-3-handling-date-formats)
+- [ObjectMapper.convertValue() 遇到的一些問題](https://blog.csdn.net/weixin_39778417/article/details/103304940)
+- [Jacksonで、オブジェクトをシリアライズする際にnullのプロパティを出力しないようにする](https://kazuhira-r.hatenablog.com/entry/2023/01/15/210749)
+
+### Test
+
+- [Testing the Web Layer](https://spring.io/guides/gs/testing-web)
+- [Is Java's assertEquals method reliable?](https://stackoverflow.com/a/1201944)
+- [Assert an Exception Is Thrown in JUnit 4 and 5](https://www.baeldung.com/junit-assert-exception)
+- [在 Spring boot 上撰寫 API 與 Service 的單元測試 JUnit、Mockito](https://bingdoal.github.io/backend/2021/12/api-and-service-unit-test-on-spring-boot-junit-mockito/)
+- [Testing in Spring Boot](https://www.baeldung.com/spring-boot-testing)
+- [Spring Boot - Rest Controller Unit Test](https://www.tutorialspoint.com/spring_boot/spring_boot_rest_controller_unit_test.htm)
+- [Best Practices for How to Test Spring Boot Applications](https://spring.academy/guides/spring-spring-boot-testing)
+- [Testing with Spring Boot and @SpringBootTest](https://reflectoring.io/spring-boot-test/)
+- [How to populate test data programmatically for integration tests in Spring?](https://stackoverflow.com/a/35065462)
+- [Quick Guide on Loading Initial Data with Spring Boot](https://www.baeldung.com/spring-boot-data-sql-and-schema-sql)
+- [Testing Exceptions with Spring MockMvc](https://www.baeldung.com/spring-mvc-test-exceptions)
+- [Spring mock MVC unit test with controller advice](https://stackoverflow.com/a/48380572)
+- [How to test exceptions handling in @ControllerAdvice](https://stackoverflow.com/a/76341135)
+- [Spring MVC Controllers Unit Test not calling @ControllerAdvice](https://stackoverflow.com/a/28727831)
+- [Support default character encoding for response in MockMvc](https://github.com/spring-projects/spring-framework/issues/27230#issuecomment-1816150215)
+- [AssertContains on strings in jUnit](https://stackoverflow.com/a/13777283)
+- [Join String list elements with a delimiter in one step [duplicate]](https://stackoverflow.com/a/22949211)
+
+## Deployments
+
+- [Native Images with Spring Boot and GraalVM](https://www.baeldung.com/spring-native-intro)
